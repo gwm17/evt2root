@@ -29,6 +29,10 @@ evt2root::evt2root() {
   rand = new TRandom3();
 
 }
+//destructor
+evt2root::~evt2root() {
+  delete rand;
+}
 
 /* Reset()
  * Each event needs to be processed separately; so clean the variables
