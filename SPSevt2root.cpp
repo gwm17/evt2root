@@ -81,6 +81,19 @@ void evt2root::Reset() {
 
 }
 
+/*Rebin()
+ *Eliminates beating pattern from raw mtdc data
+ *by accounting for binning uncertainty
+ */
+void evt2root::Rebin(vector<Int_t> &module) {
+  for (unsigned int i=0, i<32, i++) {
+    if(module[i] != 0) {
+      Float_t r = random->Uniform(0.,1.0);
+      Float_t value = module[i]+r;
+      module[i] = (Int_t) value;
+    }
+  }
+}
 
 /*setParameters()
  *Does the heavy lifting of setting all non-raw channel paramters.
@@ -169,6 +182,7 @@ void evt2root::unpack(uint16_t* eventPointer, uint32_t ringSize) {
     }
   }
 
+  Rebin(mtdc1); Rebin(adc1); Rebin(adc2); Rebin(adc3); Rebin(tdc1);
   setParameters();
   DataTree->Fill();
 }
