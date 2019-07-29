@@ -22,26 +22,29 @@
 #include <vector>
 #include <utility>
 #include <cstdint>
+
+using namespace std;
+
 struct ParsedmTDCEvent {
   int s_id;
   int s_res;
   int s_count;
   int s_eventNumber;   
-  std::vector<std::pair<int, std::uint16_t>> s_data;
+  vector<pair<int, uint16_t>> s_data;
 };
 
 class mTDCUnpacker {
   public:
-    std::pair< uint16_t*, ParsedmTDCEvent> parse( uint16_t* begin,  uint16_t* end, int id);
-    bool isHeader(std::uint16_t word);
+    pair<uint32_t*, ParsedmTDCEvent> parse(uint32_t* begin,uint32_t* end);
+    bool isHeader(uint32_t word);
 
   private:
-    bool isData(std::uint16_t word);
-    bool isEOE(std::uint16_t word); 
+    bool isData(uint32_t word);
+    bool isEOE(uint32_t word); 
    
-    void unpackHeader(std::uint16_t* word, ParsedmTDCEvent& event);
-    void unpackDatum(std::uint16_t* word, ParsedmTDCEvent& event); 
-    uint16_t* unpackData( uint16_t* begin,  uint16_t* end, ParsedmTDCEvent& event); 
+    void unpackHeader(uint32_t* word, ParsedmTDCEvent& event);
+    void unpackDatum(uint32_t* word, ParsedmTDCEvent& event); 
+    uint32_t* unpackData(uint32_t* begin,uint32_t* end,ParsedmTDCEvent& event); 
 };
 
 #endif

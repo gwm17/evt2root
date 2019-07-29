@@ -33,13 +33,9 @@ evt2root::evt2root() {
   adc1.resize(32); adc2.resize(32); adc3.resize(32); tdc1.resize(32); mtdc1.resize(32);
 
   adc1_geo = 3;//Set geo addresses here
-  adc_geos.push_back(adc1_geo);
   adc2_geo = 4;
-  adc_geos.push_back(adc2_geo);
   adc3_geo = 5;
-  adc_geos.push_back(adc3_geo);
   tdc1_geo = 8;
-  adc_geos.push_back(tdc1_geo);
   mtdc1_id = 9;
   rand = new TRandom3();
 
@@ -78,6 +74,7 @@ void evt2root::Reset() {
   anode1_time = -1000.0;
   anode2_time = -1000.0;
   plastic_time = -1000.0;
+  monitor = -1000;
 
 }
 
@@ -87,7 +84,7 @@ void evt2root::Reset() {
  */
 void evt2root::Rebin(vector<Int_t> &module) {
   for (unsigned int i=0; i<32; i++) {
-    if(module[i] != 0) {
+    if(module[i] != -1000) {
       Float_t r = rand->Uniform(0.,1.0);
       Float_t value = module[i]+r;
       module[i] = (Int_t) value;
@@ -108,19 +105,24 @@ void evt2root::setParameters() {
   Float_t mtdc103 = ((Float_t)mtdc1[3]+r[2])*nanos_per_chan;
   Float_t mtdc104 = ((Float_t)mtdc1[4]+r[3])*nanos_per_chan;
  
-  fp_plane1_tdiff = (mtdc102-mtdc101)/2.0;
-  fp_plane1_tave = (mtdc102+mtdc101)/2.0;
-  fp_plane1_tsum = (mtdc102+mtdc101);
-  
-  fp_plane2_tdiff = (mtdc104-mtdc103)/2.0;
-  fp_plane2_tave = (mtdc104+mtdc103)/2.0;
-  fp_plane2_tsum = (mtdc104+mtdc103);
+  if(mtdc1[1] != -1000 && mtdc1[2] != -1000) {
+    fp_plane1_tdiff = (mtdc102-mtdc101)/2.0;
+    fp_plane1_tave = (mtdc102+mtdc101)/2.0;
+    fp_plane1_tsum = (mtdc102+mtdc101);
+  }
+ 
+  if(mtdc1[3] != -1000 && mtdc1[4] != -1000) { 
+    fp_plane2_tdiff = (mtdc104-mtdc103)/2.0;
+    fp_plane2_tave = (mtdc104+mtdc103)/2.0;
+    fp_plane2_tsum = (mtdc104+mtdc103);
+  }
    
   anode1 = adc3[4];
   anode2 = adc3[5];
   scint1 = adc3[6];
   scint2 = adc3[9];
   cathode = adc3[8];
+  monitor = adc3[0];
 
   plastic_sum = ((Float_t)scint1+rand->Rndm())+((Float_t)scint2+rand->Rndm());
   anode1_time = (Float_t)mtdc1[5]+rand->Rndm();
@@ -136,35 +138,34 @@ void evt2root::setParameters() {
  */
 void evt2root::unpack(uint16_t* eventPointer, uint32_t ringSize) {
 
-  uint16_t* iterPointer = eventPointer;
-  uint32_t numWords = *iterPointer++;
+  uint32_t numWords = (*eventPointer++)/2;
+  uint32_t* iterPointer = (uint32_t*)eventPointer;
+  int ringSize_32word = ringSize/4;
   try {
-    if(numWords>ringSize) {
+    if(numWords>ringSize_32word) {
       string size_err = "Incorrectly formated physics ring!";
       throw size_err;
     }
   } catch (string size_err) {
-    //cout<<size_err<<endl; //for testing
+    cout<<size_err<<endl;
     return;
   }
-  uint16_t* end =  eventPointer + numWords+1;
+  uint32_t* end =  iterPointer + numWords;
   vector<ParsedmTDCEvent> mtdcData;
   vector<ParsedADCEvent> adcData;
 
   Reset();//wipe variables
-
   while (iterPointer<end){
-    //check if header matches; for adc looks like readout puts something like header
-    //after a EOE, skip those too
-    if (adc_unpacker.isHeader(*iterPointer) && *(iterPointer-1) != 0xffff) {
-      auto adc = adc_unpacker.parse(iterPointer-1, end, adc_geos);
+    //check if header matches
+    if (adc_unpacker.isHeader(*iterPointer)) {
+      auto adc = adc_unpacker.parse(iterPointer, end);
       adcData.push_back(adc.second);
       iterPointer = adc.first;
     } else if (mtdc_unpacker.isHeader(*iterPointer)) {
-      auto mtdc = mtdc_unpacker.parse(iterPointer-1, end, mtdc1_id);
+      auto mtdc = mtdc_unpacker.parse(iterPointer, end);
       mtdcData.push_back(mtdc.second);
       iterPointer = mtdc.first;
-    } else iterPointer++;
+    } else {iterPointer++;}
   }
 
   for (auto& event : adcData) {
@@ -229,6 +230,7 @@ int evt2root::run() {
   DataTree->Branch("scint1", &scint1, "scint1/I");
   DataTree->Branch("scint2", &scint2, "scint2/I");
   DataTree->Branch("cathode", &cathode, "cathode/I");
+  DataTree->Branch("monitor", &monitor, "monitor/I");
   DataTree->Branch("plastic_sum", &plastic_sum, "plastic_sum/F");
   DataTree->Branch("anode1_time", &anode1_time, "anode1_time/F");
   DataTree->Branch("anode2_time", &anode2_time, "anode2_time/F");

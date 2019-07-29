@@ -23,87 +23,71 @@ using namespace std;
 
 //This is where most chagnes need to be made for each module; most else is just name changes
 //useful masks and shifts for ADC:
-static const uint16_t TYPE_MASK (0x0700);
-static const uint16_t TYPE_HDR (0x0200);
-static const uint16_t TYPE_DATA (0x0000);
-static const uint16_t TYPE_TRAIL (0x0400);
+static const uint32_t TYPE_MASK (0x07000000);
+static const uint32_t TYPE_HDR (0x02000000);
+static const uint32_t TYPE_DATA (0x00000000);
+static const uint32_t TYPE_TRAIL (0x04000000);
 
-static const unsigned GEO_SHIFT (11);
-static const uint16_t GEO_MASK (0xf800);
+static const unsigned GEO_SHIFT (27);
+static const uint32_t GEO_MASK (0xf8000000);
 
 //header-specific:
 static const unsigned HDR_COUNT_SHIFT (8);
-static const uint16_t HDR_COUNT_MASK (0x3f00);
+static const uint32_t HDR_COUNT_MASK (0x00003f00);
 static const unsigned HDR_CRATE_SHIFT (16);
-static const uint16_t HDR_CRATE_MASK (0x00ff);
+static const uint32_t HDR_CRATE_MASK (0x00ff0000);
 
 //data-specific:
-static const unsigned DATA_CHANSHIFT (0);
-static const uint16_t DATA_CHANMASK (0x001f);
-static const uint16_t DATA_CONVMASK (0x3fff);
+static const unsigned DATA_CHANSHIFT (16);
+static const uint32_t DATA_CHANMASK (0x001f0000);
+static const unsigned DATA_CONVSHIFT(0);
+static const uint32_t DATA_CONVMASK (0x00003fff);
 
 
-pair< uint16_t*, ParsedADCEvent> ADCUnpacker::parse( uint16_t* begin,  uint16_t* end,
-                                                     vector<int> geos) {
+pair<uint32_t*,ParsedADCEvent> ADCUnpacker::parse(uint32_t* begin,uint32_t* end) {
 
   ParsedADCEvent event;
   int bad_flag = 0;
-  int geo_flag = 0;
-
   auto iter = begin;
-
   unpackHeader(iter, event);
   if (iter>end)  {
     bad_flag = 1;
   }
-  iter+=2;
-  int nWords = event.s_count*2;
+  iter++;
+  int nWords = event.s_count;
   auto dataEnd = iter + nWords;
-  for(unsigned int i=0; i<geos.size(); i++) {
-    if(event.s_geo == geos[i]) {
-      geo_flag = 1;
-      break;
-    }
-  }
-  if (!geo_flag){//If unexpected geo, skip all data words; either bad event or bad stack
+  if(dataEnd > end) {
     bad_flag = 1;
-    iter+=nWords;
-    //Error testing
-    //cout<<"Bad ADC geo: "<<event.s_geo<<endl;  
   } else {
     iter = unpackData(iter, dataEnd, event);
   }
-  if (iter>end || bad_flag || !isEOE(*(iter+1))){
-    //Error testing
-    //cout<<"ADCUnpacker::parse() ";
-    //cout<<"Unable to unpack event"<<endl;
+  if (iter>end || bad_flag || !isEOE(*(iter))){
+    cout<<"ADCUnpacker::parse() ";
+    cout<<"Unable to unpack event"<<endl;
   }
-  
-
-  iter+=2;
+  iter++;
 
   return make_pair(iter, event);
 
 }
 
-bool ADCUnpacker::isHeader(uint16_t word) {
+bool ADCUnpacker::isHeader(uint32_t word) {
   return ((word&TYPE_MASK) == TYPE_HDR);
 }
 
-void ADCUnpacker::unpackHeader(uint16_t* word, ParsedADCEvent& event) {
+void ADCUnpacker::unpackHeader(uint32_t* word, ParsedADCEvent& event) {
 
   //Error handling: if not valid header throw event to 0 at chan 0 at not real geo  
   try {
-    if (!isHeader(*(word+1))) {
+    if (!isHeader(*(word))) {
       string errmsg("ADCUnpacker::parseHeader() ");
       errmsg += "Found non-header word when expecting header. ";
       errmsg += "Word = ";
-      unsigned short w = *(word+1);
+      unsigned int w = *(word);
       errmsg += to_string(w);
       throw errmsg;
     }
     event.s_count = (*word&HDR_COUNT_MASK) >> HDR_COUNT_SHIFT;
-    ++word;
     event.s_geo = (*word&GEO_MASK)>>GEO_SHIFT;
     event.s_crate = (*word&HDR_CRATE_MASK) >> HDR_CRATE_SHIFT;
   } catch (string errmsg) {
@@ -114,25 +98,29 @@ void ADCUnpacker::unpackHeader(uint16_t* word, ParsedADCEvent& event) {
     int channel = 0;
     auto chanData = make_pair(channel, data);
     event.s_data.push_back(chanData);
-    //cout<<errmsg<<endl; //only turn on during testing
+    cout<<errmsg<<endl; 
   }
 }
 
-bool ADCUnpacker::isData(uint16_t word) {
+bool ADCUnpacker::isData(uint32_t word) {
   return ((word&TYPE_MASK) == TYPE_DATA);
 }
 
-void ADCUnpacker::unpackDatum(uint16_t* word, ParsedADCEvent& event) {
+void ADCUnpacker::unpackDatum(uint32_t* word, ParsedADCEvent& event) {
   
-  //Error testing
   try {
-    if (!isData(*(word+1))) {
+    if (!isData(*(word))) {
       string errmsg("ADCUnpacker::unpackDatum() ");
       errmsg += "Found non-data word when expecting data.";
       throw errmsg;
     }
-    uint16_t data = *word&DATA_CONVMASK;
-    ++word;
+    uint16_t test_geo = (*word&GEO_MASK)>>GEO_SHIFT;
+    if(test_geo != event.s_geo) {
+      string errmsg("ADCUnpacker::unpackDatum() ");
+      errmsg+="Found non-matching geoaddress when unpacking data.";
+      throw errmsg;
+    }
+    uint16_t data = (*word&DATA_CONVMASK)>>DATA_CONVSHIFT;
     int channel = (*word&DATA_CHANMASK) >> DATA_CHANSHIFT;
     auto chanData = make_pair(channel, data);
     event.s_data.push_back(chanData);
@@ -142,26 +130,26 @@ void ADCUnpacker::unpackDatum(uint16_t* word, ParsedADCEvent& event) {
     int channel = 0;
     auto chanData = make_pair(channel, data);
     event.s_data.push_back(chanData);
-    //cout<<errmsg<<endl; //only turn on during testing
+    cout<<errmsg<<endl;
   }
   
 }
 
-uint16_t* ADCUnpacker::unpackData( uint16_t* begin,uint16_t* end, ParsedADCEvent& event) {
+uint32_t* ADCUnpacker::unpackData(uint32_t* begin,uint32_t* end, ParsedADCEvent& event) {
 
   event.s_data.reserve(event.s_count); //memory allocation
 
   auto iter = begin;
   while (iter!=end) {
-    unpackDatum(iter, event);
-    iter = iter+2;
+      unpackDatum(iter, event);
+      iter = iter+1;
   }
 
   return iter;
 
 }
 
-bool ADCUnpacker::isEOE(uint16_t word) {
+bool ADCUnpacker::isEOE(uint32_t word) {
   return ((word&TYPE_MASK) == TYPE_TRAIL);
 }
 

@@ -24,27 +24,28 @@
 #include <cstdint>
 #include <stdexcept>
 
+using namespace std;
+
 struct ParsedADCEvent {
   int s_geo;
   int s_crate;
   int s_count;
   int s_eventNumber;   
-  std::vector<std::pair<int, std::uint16_t>> s_data;
+  vector<pair<int, uint16_t>> s_data;
 };
 
 class ADCUnpacker {
   public:
-    std::pair< uint16_t*, ParsedADCEvent> parse( uint16_t* begin,  uint16_t* end,
-                                                 std::vector<int> geos);
-    bool isHeader(std::uint16_t word);
+    pair<uint32_t*, ParsedADCEvent> parse(uint32_t* begin,uint32_t* end);
+    bool isHeader(uint32_t word);
 
   private:
-    bool isData(std::uint16_t word);
-    bool isEOE(std::uint16_t word); 
+    bool isData(uint32_t word);
+    bool isEOE(uint32_t word); 
    
-    void unpackHeader(std::uint16_t* word, ParsedADCEvent& event);
-    void unpackDatum(std::uint16_t* word, ParsedADCEvent& event); 
-    uint16_t* unpackData( uint16_t* begin,  uint16_t* end, ParsedADCEvent& event); 
+    void unpackHeader(uint32_t* word, ParsedADCEvent& event);
+    void unpackDatum(uint32_t* word, ParsedADCEvent& event); 
+    uint32_t* unpackData(uint32_t* begin,uint32_t* end,ParsedADCEvent& event); 
 };
 
 #endif

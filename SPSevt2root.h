@@ -47,14 +47,13 @@ class evt2root {
 
     //ROOT branch parameters
     vector<Int_t> adc1, adc2, adc3, tdc1, mtdc1;
-    Int_t anode1, anode2, scint1, scint2, cathode;    
+    Int_t anode1, anode2, scint1, scint2, cathode, monitor;    
     Float_t fp_plane1_tdiff, fp_plane2_tdiff, fp_plane1_tsum, fp_plane2_tsum,
             fp_plane1_tave, fp_plane2_tave, plastic_sum, anode1_time, anode2_time,
              plastic_time;
 
     //geoaddresses
     int adc1_geo, adc2_geo, adc3_geo, tdc1_geo, mtdc1_id;
-    vector<int> adc_geos;
 
     //module unpackers
     ADCUnpacker adc_unpacker;

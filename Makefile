@@ -1,17 +1,19 @@
 CC=g++
-CFLAGS=-c -g -Wall `root-config --cflags`
+CFLAGS=-std=c++11 -c -g -Wall `root-config --cflags`
 LDFLAGS=`root-config --glibs`
-SOURCES=SPSevt2root.cpp ADCUnpacker.cpp mTDCUnpacker.cpp main.cpp
-OBJECTS=$(SOURCES:.cpp=.o)
-EXECUTABLE=evt2root
+SOURCES=$(wildcard ./*.cpp)
+OBJS=$(SOURCES:%.cpp=%.o)
+EXE=evt2root
 
-all: $(SOURCES) $(EXECUTABLE)
+.PHONY: clean all
 
-$(EXECUTABLE): $(OBJECTS)
-	$(CC) $(LDFLAGS) $(OBJECTS) -o $@
-.cpp.o:
+all: $(EXE)
+
+$(EXE): $(OBJS)
+	$(CC) $(LDFLAGS) $^ -o $@
+
+%.o: %.cpp
 	$(CC) $(CFLAGS) $< -o $@
 
-.PHONY: clean
 clean:
-	rm ./*.o ./evt2root
+	$(RM) $(EXE) $(OBJS)
